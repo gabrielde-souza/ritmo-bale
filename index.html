@@ -1,0 +1,258 @@
+
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Ritmo de Balé - Jogo</title>
+  <style>
+    body {
+      margin: 0;
+      font-family: Arial, sans-serif;
+      background: linear-gradient(to bottom, #fff0f5, #f8bbd0);
+      overflow: hidden;
+    }
+    #startScreen, #game, #endScreen {
+      position: absolute;
+      width: 100vw;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      z-index: 2;
+    }
+    #game {
+      display: none;
+    }
+    #endScreen {
+      background-color: rgba(0, 0, 0, 0.7);
+      color: white;
+      display: none;
+    }
+    .button {
+      background-color: #e91e63;
+      color: white;
+      border: none;
+      padding: 15px 30px;
+      font-size: 20px;
+      margin: 10px;
+      border-radius: 10px;
+      cursor: pointer;
+    }
+    .feedback {
+      position: absolute;
+      top: 20%;
+      left: 50%;
+      transform: translateX(-50%);
+      font-size: 48px;
+      color: #d81b60;
+      font-weight: bold;
+      opacity: 0;
+      transition: opacity 0.3s ease, transform 0.3s ease;
+      z-index: 3;
+    }
+    #score {
+      position: absolute;
+      top: 10px;
+      right: 20px;
+      font-size: 24px;
+      color: #880e4f;
+    }
+    .hit-box {
+      position: absolute;
+      bottom: 100px;
+      width: 80px;
+      height: 80px;
+      background: white;
+      border: 3px solid #ec407a;
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 32px;
+      font-weight: bold;
+      color: #ec407a;
+    }
+    #up { left: 24.5%; }
+    #down { left: 39.5%; }
+    #left { left: 54.5%; }
+    #right { left: 69.5%; }
+
+    #pauseBtn {
+      position: absolute;
+      top: 10px;
+      left: 20px;
+      font-size: 20px;
+      background: #f06292;
+      color: white;
+      border: none;
+      padding: 8px 16px;
+      border-radius: 8px;
+      cursor: pointer;
+    }
+  </style>
+</head>
+<body>
+  <div id="startScreen">
+    <h1>🎀 Ritmo de Balé 🎀</h1>
+    <p>Escolha a dificuldade:</p>
+    <button class="button" onclick="startGame(1)">Fácil</button>
+    <button class="button" onclick="startGame(1.5)">Médio</button>
+    <button class="button" onclick="startGame(2)">Difícil</button>
+  </div>
+
+  <div id="game">
+    <button id="pauseBtn" onclick="togglePause()">⏸ Pausar</button>
+    <canvas id="gameCanvas"></canvas>
+    <div id="score">Pontuação: 0</div>
+    <div class="feedback" id="feedback"></div>
+    <div class="hit-box" id="up">↑</div>
+    <div class="hit-box" id="down">↓</div>
+    <div class="hit-box" id="left">←</div>
+    <div class="hit-box" id="right">→</div>
+  </div>
+
+  <div id="endScreen">
+    <h2>Fim de Jogo!</h2>
+    <p id="finalScore">Pontuação final: 0</p>
+    <button class="button" onclick="restartGame()">Jogar Novamente</button>
+    <button class="button" onclick="location.reload()">Sair</button>
+  </div>
+
+  <audio id="music" src="https://cdn.pixabay.com/download/audio/2022/10/12/audio_44c22b6cf6.mp3?filename=the-nutcracker-dance-of-the-sugar-plum-fairy-122007.mp3"></audio>
+
+  <script>
+    let canvas = document.getElementById("gameCanvas");
+    let ctx = canvas.getContext("2d");
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+
+    let keys = {};
+    let notes = [];
+    let score = 0;
+    let intervalId;
+    let isPaused = false;
+    let speed = 1;
+    let feedbacks = ["Ótimo!", "Boa!", "Esse é o ritmo!", "Mandou bem!", "Perfeito!"];
+
+    document.addEventListener("keydown", (e) => {
+      keys[e.key] = true;
+      if (!isPaused) checkHit(e.key);
+    });
+
+    document.addEventListener("keyup", (e) => {
+      keys[e.key] = false;
+    });
+
+    function togglePause() {
+      isPaused = !isPaused;
+      document.getElementById("pauseBtn").textContent = isPaused ? "▶ Continuar" : "⏸ Pausar";
+    }
+
+    function startGame(vel) {
+      speed = vel;
+      document.getElementById("startScreen").style.display = "none";
+      document.getElementById("game").style.display = "block";
+      notes = [];
+      score = 0;
+      document.getElementById("score").textContent = "Pontuação: 0";
+      document.getElementById("music").play();
+      intervalId = setInterval(spawnNote, 1000);
+      requestAnimationFrame(update);
+    }
+
+    function endGame() {
+      clearInterval(intervalId);
+      document.getElementById("finalScore").textContent = "Pontuação final: " + score;
+      document.getElementById("game").style.display = "none";
+      document.getElementById("endScreen").style.display = "flex";
+      document.getElementById("music").pause();
+      document.getElementById("music").currentTime = 0;
+    }
+
+    function restartGame() {
+      document.getElementById("endScreen").style.display = "none";
+      startGame(speed);
+    }
+
+    function spawnNote() {
+      let directions = ["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight"];
+      let key = directions[Math.floor(Math.random() * directions.length)];
+      let x = { ArrowUp: 0.245, ArrowDown: 0.395, ArrowLeft: 0.545, ArrowRight: 0.695 }[key] * canvas.width;
+      notes.push({ key: key, x: x, y: 0 });
+    }
+
+    function checkHit(key) {
+      for (let i = 0; i < notes.length; i++) {
+        let note = notes[i];
+        let targetY = canvas.height - 100;
+        let dist = Math.abs(note.y - targetY);
+        if (note.key === key && dist < 80) {
+          notes.splice(i, 1);
+          if (dist < 20) {
+            score += 2;
+            showFeedback("Perfeito!");
+          } else {
+            score += 1;
+            showFeedback("Bom!");
+          }
+          document.getElementById("score").textContent = "Pontuação: " + score;
+          return;
+        }
+      }
+      endGame();
+    }
+
+    function showFeedback(msg) {
+      let fb = document.getElementById("feedback");
+      fb.textContent = msg;
+      fb.style.opacity = 1;
+      fb.style.transform = "translateX(-50%) scale(1.2)";
+      setTimeout(() => {
+        fb.style.opacity = 0;
+        fb.style.transform = "translateX(-50%) scale(1)";
+      }, 500);
+    }
+
+    function drawStickFigure(x, y, timeOffset = 0) {
+      ctx.strokeStyle = "#6a1b9a";
+      ctx.lineWidth = 3;
+      let t = Date.now() / 300 + timeOffset;
+      let armOffset = Math.sin(t) * 10;
+      let legOffset = Math.cos(t) * 5;
+
+      ctx.beginPath(); ctx.arc(x, y, 10, 0, Math.PI * 2); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(x, y + 10); ctx.lineTo(x, y + 40); ctx.stroke();
+
+      ctx.beginPath();
+      ctx.moveTo(x - 15 + armOffset, y + 20);
+      ctx.lineTo(x + 15 - armOffset, y + 20);
+      ctx.stroke();
+
+      ctx.beginPath();
+      ctx.moveTo(x, y + 40);
+      ctx.lineTo(x - 10 + legOffset, y + 60);
+      ctx.moveTo(x, y + 40);
+      ctx.lineTo(x + 10 - legOffset, y + 60);
+      ctx.stroke();
+    }
+
+    function update() {
+      if (!isPaused) {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        notes.forEach(note => {
+          note.y += speed;
+          ctx.fillStyle = "#ec407a";
+          ctx.beginPath();
+          ctx.arc(note.x, note.y, 20, 0, Math.PI * 2);
+          ctx.fill();
+        });
+        drawStickFigure(canvas.width * 0.15, canvas.height - 100);
+        drawStickFigure(canvas.width * 0.85, canvas.height - 100);
+      }
+      requestAnimationFrame(update);
+    }
+  </script>
+</body>
+</html>
